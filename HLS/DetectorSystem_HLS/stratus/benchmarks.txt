@@ -1,0 +1,7 @@
+1. Before coding style refinement
+make sim_V_BASIC
+Total run time = 80609280 ns
+
+2. After coding style refinement
+make sim_V_BASIC
+Total run time = 26869750 ns
