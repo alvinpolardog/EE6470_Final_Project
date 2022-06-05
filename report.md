@@ -71,9 +71,9 @@ The architecture of the actual RISCV VP simulation is as follows:
 Each RISCV core will be connected to one PE, and will control the data transfer between them for 
 the respective data partition. The first core (hartid==0) will be responsible for reading the stimulus data into the global memory as well as outputting the result onto a file.
 
-To prevent the cores from transfering data to the detector system before the input data is read or after the result is being output, barriers are placed before and after the data transfering stage.
+To prevent the cores from transfering data to the detector system before the input data is read or after the result is being output, synchronization barriers are placed before and after the data transfering stage.
 
-One key note in using multiple cores is not allowing multiple core to read/write into the same location at a single period of time, that is, a race condition. This problem does not affect my resulting output, since the output is only written when there is a spike, and so it does not matter which core is writing to it. The place where the problem does prevail is the DMA. Since DMA requires multiple location to be written to in one consecutive write, it does not work well with multiple cores, at least without any modification. To fix this issue, a mutex was used so that only one core can access the DMA at one time.
+One key note in using multiple cores is not allowing multiple core to read/write into the same location at a single period of time, that is, race conditions. This problem does not affect the NEO resulting output, since the output is only written when there is a spike, and which core is writing to it does not matter. The place where the problem does materialize is at the DMA. Since DMA requires multiple location to be written to in one consecutive write, it does not work well with multiple cores, at least without any modification. To fix this issue, a mutex was used so that only one core can access the DMA at one time.
 
 The following is the result of RISCV VP simulation:
 | Configuration | Simulation Time (ns) | num-instru (Core 1) |num-instru (Core 2) |
@@ -82,24 +82,18 @@ The following is the result of RISCV VP simulation:
 | Dual Core Dual PE | 76764550     | 2241097     | 3339491 | 
 
 
+Below is the visualization of the final result of the spike mask generated from the spike detector.
+
+![image](https://user-images.githubusercontent.com/93983804/172045417-1df1dc56-f17f-497f-bde9-c107968dddb8.png)
+
+The blue line shown is the synthesized input signal, while the black dots are the output spike mask of the system.
 
 ##  
 
 ## Final Conlusion
 
-At the two extremes, if we want only the lowest area, the original version without optimization is the smallest. If we only care about speed, the final version with pipelined unrolled loops run the fastest, albeit with much greater area.
+In the final project, it is shown that with the HLS directives optmization as well as module-level parallelization, we can achieve very good and effective result in NEO. By modifying the buffer sizes of the modules, we can also pick the perfect balance between speed and space, depending on our needs.
 
-If we want something down the middle, pipelined versions with fewer inputs work quite well, and does not use too much area.
+With the RISCV VP simulation, we can see the NEO is very fit for multicore parallelization. The main reason is that the partitioning of the input signal is very simple, at least when the input signal is not a real-time input. This allows the core to work independently, drastically reducing the simulation time.
 
-### Application
-Since I had some actual patient data on hand, I snipped out 2000 samples, and plot out the results of the module.
-
-![](https://i.imgur.com/nqWmbt0.png)
-
-The blue line indicate the original EEG signal, and the orange line is the output of the NEO module. We can see that the spikes in the blue line is somewhat difficult to makeout, especially if we had to look at multiple channels at the same time, or look at longer period of data. The spike on the orange line however is very apparent and distinguishing the spike should be much easier.
-
-![](https://i.imgur.com/0EijQA5.png)
-
-Here, we added an additional adaptive threshold calculated using pure software. It is clear that the threshold will easily weed out any unwanted noise, allowing us to quickly discern where the spikes are. Currently, the threshold caluculation is not done on the NEO module since it uses requires a buffer size of at least a few hundred samples to work properly, and thus would completely overwhelm the area size, making our comparisons between different architecture meaningless. 
-
-However just with the NEO, we can see that using HLS, we can produce a design that is practical l in the real-time processing of EEG, and that the optimization directives allow us to speed up the design by a factor of nearly 20.
+From the midterm and final project, it is clear that HLS and RISCV VP provides a very fast way to test algorithms on their synthesizability as well as how they may run with RISCV cores. With my topic of spike detection with NEO, it is also clear that algorithms with simple kernel function work escpecially well for acceleration using PE.
