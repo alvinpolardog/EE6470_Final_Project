@@ -45,6 +45,8 @@ The thresholding module accumulated the input NEO values, and solve for a thresh
 compared to the threshold value individually, and the ones that exceeded it are marked and output. 
 
 #### HLS Optimization Comparison
+In high level synthesis, since the NEO module has already been optimized, I had instead modified the buffer size of the NEO module and the thresholding module to see
+how it may affect runtime and area.
 
 | Optimization | Total Runtime (ns) | Time Difference | Area | Area Difference | Average Latency (Cycles) |
 | -------- | -------- | -------- | ------ | ------ | ---- |
@@ -55,45 +57,35 @@ compared to the threshold value individually, and the ones that exceeded it are 
 | Buffer Size = 6   | 15010     | -49.9%        | 6290.2  | +90.5%    | 4|
 | DPA (BS = 6)      | 15010     | -49.9%        | 5848.3  | +77.1%    | 4|
 
+The result shows a clear correlation between the buffer size and the resulting parameters. With a larger buffer size, there is less redundancy in the transfered data as well as a higher amount of data each transfer carries, these lead to lower amount of transfers for the same dataset, and thus improving runtime but at the cost of area. 
 
 
 ### RISCV VP Simulation
+For RISCV VP simulation, I first partition the input signal according to the number of cores. In this example, I chose 2 cores, thus the signal is cut in half. However, since the signal around the cut will be lost due to the nature of NEO, the left partition will always overlap the right partition a few extra samples. This redundancy allows the cut signal to still be examined by at least one core for spikes.
+
+![image](https://user-images.githubusercontent.com/93983804/172044464-f11f2db4-4a0f-49ca-9c46-0242f89a847f.png)
+
+The architecture of the actual RISCV VP simulation is as follows:
+![image](https://user-images.githubusercontent.com/93983804/172044486-a488ec4a-2c51-46c9-b6ff-f756378faf45.png)
+
+Each RISCV core will be connected to one PE, and will control the data transfer between them for 
+the respective data partition. The first core (hartid==0) will be responsible for reading the stimulus data into the global memory as well as outputting the result onto a file.
+
+To prevent the cores from transfering data to the detector system before the input data is read or after the result is being output, barriers are placed before and after the data transfering stage.
+
+One key note in using multiple cores is not allowing multiple core to read/write into the same location at a single period of time, that is, a race condition. This problem does not affect my resulting output, since the output is only written when there is a spike, and so it does not matter which core is writing to it. The place where the problem does prevail is the DMA. Since DMA requires multiple location to be written to in one consecutive write, it does not work well with multiple cores, at least without any modification. To fix this issue, a mutex was used so that only one core can access the DMA at one time.
+
+The following is the result of RISCV VP simulation:
+| Configuration | Simulation Time (ns) | num-instru (Core 1) |num-instru (Core 2) |
+| -------- | -------- | -------- | ------ |
+| Single Core Single PE | 134931100 | 3612849   || 
+| Dual Core Dual PE | 76764550     | 2241097     | 3339491 | 
 
 
 
 ##  
 
 ## Final Conlusion
-
-Take a look at the full comparison.
-
-| Optimization | Total Runtime (ns) | Time Difference | Area | Area Difference | Average Latency (Cycles) |
-| -------- | -------- | -------- | ------ | ------ | ---- |
-| [V1] No Optimization | 119950 | *benchmark*   | **2969.1** | *benchmark* | 5|
-| [V1] DPOPT    | 119950     | ±0%     | 3358.0 | +13% | 5|
-| [V1] LOOP_UNROLLING-4     | 134950     |+12%| 4360.5     | +46% | 5|
-| [V1] LOOP_UNROLLING-8     | 139950     |+12%| 5311.5     | +78% | 5|
-| [V1] PIPELINE-1     | 20040     | -83%     | 4532.4| +52% | 3|
-| [V1] PIPELINE-1 DPOPT   | 20040     | -83%     | 4150.4 | +39% | 3|
-| [V1] PIPELINE-2     | 40030     | -67%     | 3973.8 | +34% | 4|
-| [V1] PIPELINE-2 DPOPT  | 40030     | -67%     | 4208.8 | +41% | 4|
-| [V2] No Optimization | 113730 | -5%   | 14542.7| +389% | 89|
-| [V2] DPOPT    | 78050     | -35%     | 12515.8| +321% | 61|
-| [V2] LOOP_UNROLLING-2     | 113730     |-5%| 21346.5    | +618% | 89|
-| [V2] LOOP_UNROLLING-2 DPOPT     | 86970     |-38%| 17725.7     | +497% | 68|
-| [V2] PIPELINE-1     |42370     | -65%     | 16040.4 | +440% | 32|
-| [V2] PIPELINE-1 DPOPT   |42370     | -65%     | 9947.7 | +235% | 32|
-| [V2] PIPELINE-2 DPOPT  | 60210     | -50%     | 11368.7 | +282% | 47|
-| [V3] BANDWIDTH = 2 (PIPELINE-1 DPOPT)  | 50060     | -58%      | 5305.8| +79% | 8|
-| [V3] BANDWIDTH = 3 (PIPELINE-1 DPOPT)  | 40020     | -76%     | 6263.4| +111% | 10|
-| [V3] BANDWIDTH = 4 (PIPELINE-1 DPOPT)  | 35060     | -70%       | 7242.0    | +144% | 12|
-| [V3] BANDWIDTH = 5 (PIPELINE-1 DPOPT)  | 32060     |-73%      | 8104.5     | +173% | 14|
-| [V3] BANDWIDTH = 6 (PIPELINE-1 DPOPT)  | 30060     | -75%     | 8958.9 | +202% | 16|
-| [V3] BANDWIDTH = 7 (PIPELINE-1 DPOPT)  | 28600     | -76%     | 9890.9 | +233% | 18|
-| [V3] BANDWIDTH = 8 (PIPELINE-1 DPOPT)  | 27500     | -77%     | 10781.5 | +263% | 20|
-| [V4] BANDWIDTH = 2 (PIPELINE-1 & UNROLLED LOOPS)  | 10040      | -91%      | 7093.3| +139% | 3|
-| [V4] BANDWIDTH = 3 (PIPELINE-1 & UNROLLED LOOPS)  | 6710    | -94%     | 10457.2| +252% | 3|
-| [V4] BANDWIDTH = 4 (PIPELINE-1 & UNROLLED LOOPS)  | **5040**    | **-95%**     |  13554.7| +356% | 3
 
 At the two extremes, if we want only the lowest area, the original version without optimization is the smallest. If we only care about speed, the final version with pipelined unrolled loops run the fastest, albeit with much greater area.
 
