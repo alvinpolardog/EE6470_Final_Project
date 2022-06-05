@@ -97,3 +97,5 @@ In the final project, it is shown that with the HLS directives optmization as we
 With the RISCV VP simulation, we can see the NEO is very fit for multicore parallelization. The main reason is that the partitioning of the input signal is very simple, at least when the input signal is not a real-time input. This allows the core to work independently, drastically reducing the simulation time.
 
 From the midterm and final project, it is clear that HLS and RISCV VP provides a very fast way to test algorithms on their synthesizability as well as how they may run with RISCV cores. With my topic of spike detection with NEO, it is also clear that algorithms with simple kernel function work escpecially well for acceleration using PE.
+
+In the future, I hope to use these techniques on more complicated algorithms, and see more of what HLS and multicore systems are capable of.
